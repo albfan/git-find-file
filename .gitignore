@@ -1,0 +1,13 @@
+autom4te.cache/
+Makefile
+Makefile.in
+aclocal.m4
+build-aux/
+build-aux/install-sh
+build-aux/missing
+build-aux/test-driver
+config.log
+config.status
+t/*.log
+t/*.trs
+t/test-results/

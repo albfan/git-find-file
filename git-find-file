@@ -1,8 +1,125 @@
-for branch in $(git rev-list --all)
+#!/bin/bash
+
+scriptname=$(basename $(readlink -f $0))
+
+# debug {{{
+eval SCRIPT_DEBUG="\$$(echo $scriptname | tr - _)_DEBUG"
+SCRIPT_DEBUG=${SCRIPT_DEBUG:--1}
+
+if [ "$SCRIPT_DEBUG" -ge 1 ]
+then
+   set -x
+fi
+if [ "$SCRIPT_DEBUG" -ge 10 ]
+then
+   set -v
+fi
+#}}}
+
+# functions {{{
+function help {
+   cat >&2 <<EOF
+
+Find files inside git repo
+
+$scriptname [options]
+
+Options:
+       --heads      Only search on head commits
+   -v, --verbose    Shows exactly file matched
+   -d, --decorated  Show friendly names for commits
+   -c, --color      Show color
+   -h, --help       Shows this help
+
+Examples:
+
+ # Search commits containing myfile
+ $ $scriptname myfile
+ # Search commits containing myfile and show path
+ $ $scriptname --verbose myfile
+ # Search commits containing myfile and show path on heads
+ $ $scriptname -v --heads myfile
+ # Search commits containing myfile and show path on heads decorated
+ $ $scriptname -vd --heads myfile
+ # Search commits containing myfile and show path on heads decorated with color
+ $ $scriptname -vdc --heads myfile
+
+EOF
+}
+# }}}
+
+TEMP=$(getopt -o "dcvh" -l heads,decorated,color,verbose,help -n $scriptname -- "$@" || help; exit 1)
+
+# process script arguments
+eval set -- "$TEMP"
+
+while true
 do
-  if (git ls-tree -r --name-only $branch | grep --quiet "$1") 
+  case "$1" in
+    --heads)
+      HEADS=1
+      ;;
+    -d|--decorated) 
+      DECORATED=1
+      ;;
+    -c|--color)
+      COLOR=1
+      ;;   
+    -v|--verbose)
+      VERBOSE=1
+      ;;   
+    -h|--help) # --help is captured by git and converted in git help so is useless by now
+      help
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *) 
+      cat <&2 <<EOF
+
+Error, unknown arguments $@
+EOF
+      help
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+COMMITS="--all"
+if ((HEADS))
+then
+  COMMITS+=" --simplify-by-decoration"
+fi
+
+if ((COLOR))
+then
+  showcolor="%C(auto)"
+fi
+for commit in $(git rev-list $COMMITS)
+do
+  if ((DECORATED))
   then
-     echo $branch
+    commitshow=$(git log --no-walk $commit --format="${showcolor}%h %D")
+  else
+    if ((COLOR))
+    then
+      commitshow=$(git log --no-walk $commit --format="${showcolor}%h")
+    else
+      commitshow=$commit
+    fi
+  fi
+  if ((VERBOSE))
+  then
+    git ls-tree -r --name-only $commit | grep "$1" | sed 's~^~'"$commitshow"': ~'
+  else
+    if (git ls-tree -r --name-only $commit | grep --quiet "$1") 
+    then
+      echo $commitshow
+    fi
   fi
 done
 
+# vim:fdm=marker:ts=2
